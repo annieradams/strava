@@ -15,6 +15,8 @@ library(googleway)
 library(htmlwidgets)
 library(leaflet)
 library(htmltools)
+library(googlePolylines)
+
 
 ```
 
@@ -61,8 +63,15 @@ cleaned_activities <- rStrava::compile_activities(my_actvities) %>%
   
 ```
 
+### Create faceted map plot
+
 ```{r}
 # Initialize an empty list to store data frames
+
+
+map_activities <- cleaned_activities %>% 
+  filter(nchar(map.summary_polyline) != 0)
+
 decoded_paths <- list()
 
 for (i in seq_along(map_activities$map.summary_polyline)) {
@@ -92,13 +101,31 @@ library(ggplot2)
 
 # Creating the plot with invisible facet labels
 strava_map <- ggplot(data = all_decoded_paths, aes(x = lon, y = lat)) +
-  geom_path(color = "black", size = 1) +  # Draw the paths
+  geom_path(color = "black", linewidth = 1) +  # Draw the paths
   facet_wrap(~ activity_id, scales = "free", strip.position = "bottom") +  # Organize by activity_id without labels
   theme_void() +  # Apply a theme with no background or axes
   theme(strip.text = element_blank(),
         plot.background = element_rect(fill = "white", colour = "white"),  
   panel.background = element_rect(fill = "white", colour = "white")) 
-ggsave("strava_map.png", plot = last_plot())
+
+strava_map
+#ggsave("strava_map.png", plot = last_plot())
 
 
+```
+
+### Create elevation map
+
+```{r}
+
+cleaned_activities %>% filter(type %in% c("Ride", "Hike", "Run", "Walk")) %>% 
+ggplot(aes(x = distance_miles, y = elevation_gain_ft, colour = type)) +
+        geom_point() +
+        theme_bw() +
+        theme(legend.position = "bottom", legend.title = element_blank())+ 
+        theme(plot.title = element_text(hjust = 0.5))+
+        labs(title = "Distance vs Elevation Gain",
+             colour = "Activity.Type",
+             y = "Elevation Gain (Feet)",
+             x = "Distance (Miles)" + theme_bw(base_size = 15))
 ```
