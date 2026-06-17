@@ -101,6 +101,56 @@ library(ggplot2)
 
 # Creating the plot with invisible facet labels
 strava_map <- ggplot(data = all_decoded_paths, aes(x = lon, y = lat)) +
+  geom_path(color = "black", linewidth = 0.3) +  # Draw the paths
+  facet_wrap(~ activity_id, scales = "free", strip.position = "bottom") +  # Organize by activity_id without labels
+  theme_void() +  # Apply a theme with no background or axes
+  theme(strip.text = element_blank(),
+        plot.background = element_rect(fill = "white", colour = "white"),  
+  panel.background = element_rect(fill = "white", colour = "white")) 
+
+strava_map
+ggsave("strava_map.png", plot = last_plot())
+
+
+```
+
+### Alaska Map
+
+```{r}
+alaska_activity <- cleaned_activities %>% filter(name == "not our usual coast route")
+```
+
+```{r}
+map_activities <- alaska_activity %>% 
+  filter(nchar(map.summary_polyline) != 0)
+
+decoded_paths <- list()
+
+for (i in seq_along(map_activities$map.summary_polyline)) {
+  polyline <- map_activities$map.summary_polyline[i]
+  if (!is.na(polyline) && nchar(polyline) > 0) {
+    decoded_path <- decode(polyline)
+    # Convert list to data frame if necessary
+    if (is.list(decoded_path)) {
+      decoded_df <- do.call(rbind, lapply(decoded_path, as.data.frame))
+      decoded_df$activity_id <- i  # Add an identifier for the activity
+      decoded_paths[[i]] <- decoded_df
+    } else {
+      message("Skipping activity ", i, ": decoded path is not a list.")
+    }
+  }
+}
+
+# Combine all data frames into one
+all_decoded_paths <- do.call(rbind, decoded_paths)
+
+```
+
+```{r}
+library(ggplot2)
+
+# Creating the plot with invisible facet labels
+strava_map <- ggplot(data = all_decoded_paths, aes(x = lon, y = lat)) +
   geom_path(color = "black", linewidth = 1) +  # Draw the paths
   facet_wrap(~ activity_id, scales = "free", strip.position = "bottom") +  # Organize by activity_id without labels
   theme_void() +  # Apply a theme with no background or axes
@@ -109,12 +159,10 @@ strava_map <- ggplot(data = all_decoded_paths, aes(x = lon, y = lat)) +
   panel.background = element_rect(fill = "white", colour = "white")) 
 
 strava_map
-#ggsave("strava_map.png", plot = last_plot())
-
-
+ggsave("alaska_map.png", plot = last_plot())
 ```
 
-### Create elevation map
+### Create Distance vs Elevation gain scatterplot
 
 ```{r}
 

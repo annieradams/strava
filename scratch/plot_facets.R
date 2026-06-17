@@ -26,30 +26,33 @@ plot_facets <- function(data, labels = FALSE, scales = "free", color = FALSE) {
 
   # Summarise data
   summary <- data %>%
-    dplyr::group_by(id) %>%
+    dplyr::group_by(activity_id) %>%
     dplyr::summarise(lon = mean(range(lon)),
-                     lat = mean(range(lat)),
-                     distance = sprintf("%.1f", max(cumdist)))
+                     lat = mean(range(lat)))
+                     #distance = sprintf("%.1f", max(cumdist)))
 
   # Decide if tracks will all be scaled to similar size ("free") or if
   # track sizes reflect absolute distance in each dimension ("fixed")
   if (scales == "fixed") {
     data <- data %>%
-      dplyr::group_by(id) %>% # for each track,
+      dplyr::group_by(activity_id) %>% # for each track,
       dplyr::mutate(lon = lon - mean(lon), # centre data on zero so facets can
                     lat = lat - mean(lat)) # be plotted on same distance scale
   } else {
     scales = "free" # default, in case a non-valid option was specified
   }
 
+  print("Data grouped and summarised")
+  print(head(summary))
+  
   # Decide if plot is colored by activity type or not and create a plot
   if (color) {
-    p <- ggplot2::ggplot() + ggplot2::geom_path(ggplot2::aes(lon, lat, group = id, color = Activity.Type), data, size = 0.35, lineend = "round", alpha = 0.5) + ggplot2::scale_color_brewer(palette = "Dark2", name = NULL) # color by activity type
+    p <- ggplot2::ggplot() + ggplot2::geom_path(ggplot2::aes(lon, lat, group = activity_id, color = Activity.Type), data, linewidth = 0.35, lineend = "round", alpha = 0.5) + ggplot2::scale_color_brewer(palette = "Dark2", name = NULL) # color by activity type
   } else {
-    p <- ggplot2::ggplot() + ggplot2::geom_path(ggplot2::aes(lon, lat, group = id), data, size = 0.35, lineend = "round")
+    p <- ggplot2::ggplot() + ggplot2::geom_path(ggplot2::aes(lon, lat, group = activity_id), data, linewidth = 0.35, lineend = "round")
   }
 
-  p <- p + ggplot2::facet_wrap(~id, scales = scales) + ggplot2::theme_void() +
+  p <- p + ggplot2::facet_wrap(~activity_id, scales = scales) + ggplot2::theme_void() +
     ggplot2::theme(panel.spacing = ggplot2::unit(0, "lines"),
                    strip.background = ggplot2::element_blank(), strip.text = ggplot2::element_blank(),
                    plot.margin = ggplot2::unit(rep(1, 4), "cm"),
@@ -63,9 +66,16 @@ plot_facets <- function(data, labels = FALSE, scales = "free", color = FALSE) {
   if(labels) {
     p <- p +
       ggplot2::geom_text(ggplot2::aes(lon, lat, label = distance), data = summary,
-                         alpha = 0.25, size = 3)
+                         alpha = 0.25, linewidth = 3)
   }
 
+  print("plot 1")
   # Return plot
   p
 }
+
+
+print(plot_facets(all_decoded_paths))
+
+
+ggsave("plot_output.pdf", plot_facets(all_decoded_paths), width = 10, height = 8)
