@@ -158,12 +158,6 @@ ui <- page_navbar(
           selected = "routes"
         ),
 
-        conditionalPanel(
-          "input.map_view == 'routes'",
-          sliderInput("route_opacity", "Route Opacity",
-                      min = 0.05, max = 0.9, value = 0.25, step = 0.05)
-        ),
-
         hr(class = "my-2"),
 
         actionButton(
@@ -188,16 +182,6 @@ ui <- page_navbar(
 
       div(
         class = "d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2",
-        div(
-          h4("Bike Maintenance Log", class = "mb-1"),
-          p(class = "text-muted small mb-0",
-            icon("circle-info"),
-            " To log service, edit the ",
-            tags$code("MAINTENANCE"),
-            " dates in ",
-            tags$code("global.R"),
-            " and restart the app. Miles are counted from that date forward by bike type.")
-        ),
         actionButton(
           "refresh_data2", "Refresh Activity Data",
           icon  = icon("rotate"),

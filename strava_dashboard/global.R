@@ -24,8 +24,9 @@ CACHE_FILE  <- "activities_cache.rds"
 CACHE_HOURS <- 6
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MAINTENANCE CONFIG — edit the dates here when you service your bikes.
-# Format: as.Date("YYYY-MM-DD")   |   NA = never replaced / not tracking
+# MAINTENANCE Setup 
+# Log for maintenance page
+# Update dates below when new service is performed/ parts are replaced
 # ─────────────────────────────────────────────────────────────────────────────
 
 MAINTENANCE <- list(
@@ -77,6 +78,8 @@ my_token <- get_token()
 # ── Process raw activity list ──────────────────────────────────────────────────
 process_activities <- function(act_list) {
   rStrava::compile_activities(act_list) %>%
+    
+    # Convert data to miles/ ft / hours and round
     mutate(
       distance_miles    = round(distance * 0.621371, 2),
       elevation_gain_ft = round(total_elevation_gain * 3.28084, 2),
@@ -92,7 +95,9 @@ process_activities <- function(act_list) {
     )
 }
 
-# ── Decode polylines ────────────────────────────────────────────────────────────
+# ── Decode polylines: strava encodes polylines as GoogleEncodedPolylines
+# This section decodes those lines into latitude/ longitude coordiates for the map tab
+# ────────────────────────────────────────────────────────────
 decode_routes <- function(df) {
   has_poly <- df %>%
     filter(!is.na(map.summary_polyline), nchar(map.summary_polyline) > 0)
@@ -116,7 +121,7 @@ decode_routes <- function(df) {
   do.call(rbind, Filter(Negate(is.null), paths))
 }
 
-# ── Cached data loader ─────────────────────────────────────────────────────────
+# ── Cached data loader: This section fetches the data and caches it so it doesn't overload the API  ─────────────────────────────────────────────────────────
 load_data <- function(token, force = FALSE) {
   if (!force && file.exists(CACHE_FILE)) {
     cache <- readRDS(CACHE_FILE)
@@ -136,7 +141,9 @@ load_data <- function(token, force = FALSE) {
   cache
 }
 
-# ── Maintenance helpers ────────────────────────────────────────────────────────
+# ── Maintenance helpers  ────────────────────────────────────────────────────────
+
+# Function that calculates distance since last maintenance date
 calc_miles_since <- function(activities, since_date, bike_types) {
   if (is.na(since_date) || is.null(since_date)) return(NA_real_)
   since <- suppressWarnings(as.Date(since_date))

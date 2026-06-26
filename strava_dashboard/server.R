@@ -1,15 +1,20 @@
-server <- function(input, output, session) {
 
+fmt_sport <- function(x) {
+  gsub("([a-z])([A-Z])", "\\1 \\2", x)
+}
+
+server <- function(input, output, session) {
+  
   # ── Reactive state ───────────────────────────────────────────────────────────
   data_rv <- reactiveVal(list(
     activities = activities,
     routes     = routes,
     fetched_at = app_data$fetched_at
   ))
-
+  
   acts  <- reactive(data_rv()$activities)
   paths <- reactive(data_rv()$routes)
-
+  
   # ── Filtered activities for Explore page ────────────────────────────────────
   acts_filtered <- reactive({
     req(input$explore_dates[1], input$explore_dates[2])
@@ -23,7 +28,7 @@ server <- function(input, output, session) {
     }
     a
   })
-
+  
   # ── Refresh Strava data ──────────────────────────────────────────────────────
   do_refresh <- function() {
     showNotification("Fetching data from Strava…", id = "fetching",
@@ -38,11 +43,11 @@ server <- function(input, output, session) {
       showNotification(paste("Error:", e$message), type = "error", duration = 8)
     })
   }
-
+  
   observeEvent(input$refresh_data,  do_refresh())
   observeEvent(input$refresh_map,   do_refresh())
   observeEvent(input$refresh_data2, do_refresh())
-
+  
   output$last_updated_text <- renderUI({
     t <- data_rv()$fetched_at
     if (!is.null(t)) {
@@ -50,7 +55,7 @@ server <- function(input, output, session) {
              icon("clock"), " Updated ", format(t, "%b %d %I:%M %p"))
     }
   })
-
+  
   # ── Map ──────────────────────────────────────────────────────────────────────
   filtered_paths <- reactive({
     req(input$map_dates[1], input$map_dates[2])
@@ -59,26 +64,26 @@ server <- function(input, output, session) {
              date >= input$map_dates[1],
              date <= input$map_dates[2])
   })
-
+  
   output$map <- renderLeaflet({
     leaflet(options = leafletOptions(zoomSnap = 0.5)) %>%
       addProviderTiles(providers$CartoDB.DarkMatter) %>%
       setView(lng = -117.75, lat = 33.85, zoom = 10)
   })
-
+  
   observe({
     fp   <- filtered_paths()
     view <- input$map_view
     nav  <- input$main_nav
-
+    
     req(nav == "Map")
-
+    
     proxy <- leafletProxy("map")
     proxy %>% clearGroup("routes")
     tryCatch(proxy %>% removeHeatmap("heat"), error = function(e) NULL)
-
+    
     if (nrow(fp) == 0) return()
-
+    
     if (view == "heatmap") {
       proxy %>%
         addHeatmap(
@@ -97,7 +102,7 @@ server <- function(input, output, session) {
       for (aid in ids) {
         seg  <- fp[fp$activity_id == aid, ]
         meta <- seg[1, ]
-
+        
         tip <- htmltools::HTML(sprintf(
           "<b>%s</b><br>%s<br>%.1f mi &nbsp;&bull;&nbsp; %s ft gain<br>%d min moving",
           meta$name,
@@ -106,14 +111,14 @@ server <- function(input, output, session) {
           format(round(meta$elevation_gain_ft), big.mark = ","),
           round(meta$moving_time_min)
         ))
-
+        
         proxy %>%
           addPolylines(
             lat              = seg$lat,
             lng              = seg$lon,
             color            = STRAVA_ORANGE,
             weight           = 2,
-            opacity          = opacity,
+            #opacity          = opacity,
             label            = tip,
             labelOptions     = labelOptions(
               style    = list("font-size" = "13px", "padding" = "6px 10px"),
@@ -131,11 +136,11 @@ server <- function(input, output, session) {
       }
     }
   })
-
+  
   # ── Stat cards ───────────────────────────────────────────────────────────────
   output$stat_cards <- renderUI({
     a <- acts_filtered()
-
+    
     make_card <- function(icon_name, value, label) {
       div(
         class = "col-6 col-sm-4 col-lg",
@@ -152,7 +157,7 @@ server <- function(input, output, session) {
         )
       )
     }
-
+    
     div(
       class = "row g-3",
       make_card("person-running",
@@ -175,22 +180,22 @@ server <- function(input, output, session) {
                 "Kudos Received")
     )
   })
-
+  
   # ── Activity Calendar Heatmap ────────────────────────────────────────────────
   output$heatmap_plot <- renderPlotly({
     sel_year <- as.integer(req(input$heatmap_year))
-
+    
     yr_start <- as.Date(paste0(sel_year, "-01-01"))
     yr_end   <- as.Date(paste0(sel_year, "-12-31"))
     all_days <- data.frame(date = seq(yr_start, yr_end, by = "day"))
-
+    
     # Respect sport type filter but show the full selected year
     a <- acts()
     types <- input$explore_types
     if (!is.null(types) && length(types) > 0) {
       a <- a %>% filter(sport_type %in% types)
     }
-
+    
     daily <- a %>%
       filter(!is.na(date), year == sel_year) %>%
       group_by(date) %>%
@@ -199,7 +204,7 @@ server <- function(input, output, session) {
         count = n(),
         .groups = "drop"
       )
-
+    
     cal <- all_days %>%
       left_join(daily, by = "date") %>%
       replace_na(list(miles = 0, count = 0)) %>%
@@ -214,10 +219,10 @@ server <- function(input, output, session) {
           paste0(format(date, "%b %d, %Y"), "<br>No activity")
         )
       )
-
+    
     max_miles <- max(cal$miles)
     if (max_miles == 0) max_miles <- 1
-
+    
     # Gray at 0; sharp transition to orange above 0 (normalized threshold ~2%)
     cs <- list(
       list(0,    "#e2e2e2"),
@@ -225,11 +230,11 @@ server <- function(input, output, session) {
       list(0.4,  STRAVA_ORANGE),
       list(1,    "#7a2500")
     )
-
+    
     month_starts <- seq(yr_start, as.Date(paste0(sel_year, "-12-01")), by = "month")
     month_ticks  <- as.integer(format(month_starts, "%U"))
     month_labels <- format(month_starts, "%b")
-
+    
     plot_ly(
       cal,
       x             = ~week_num,
@@ -270,38 +275,46 @@ server <- function(input, output, session) {
       ) %>%
       plotly::config(displayModeBar = FALSE)
   })
-
+  
   # ── Monthly distance bar chart ───────────────────────────────────────────────
   output$monthly_plot <- renderPlotly({
+    sport_order <- acts_filtered() %>%
+      filter(!is.na(sport_type)) %>%
+      count(sport_type, sort = TRUE) %>%
+      pull(sport_type)
+    
     a <- acts_filtered() %>%
       filter(!is.na(month)) %>%
       group_by(month, sport_type) %>%
-      summarise(miles = sum(distance_miles, na.rm = TRUE), .groups = "drop")
-
+      summarise(miles = sum(distance_miles, na.rm = TRUE), .groups = "drop") %>%
+      mutate(sport_type = factor(fmt_sport(sport_type), levels = fmt_sport(sport_order)))
+    
     plot_ly(a, x = ~month, y = ~miles, color = ~sport_type,
             type = "bar", colors = "Set2") %>%
       layout(
-        barmode = "stack",
-        xaxis   = list(title = "", tickformat = "%b '%y"),
-        yaxis   = list(title = "Miles"),
-        legend  = list(orientation = "h", y = -0.3, x = 0,
-                       font = list(size = 11)),
-        margin  = list(t = 5, b = 5),
+        barmode  = "stack",
+        xaxis    = list(title = "", tickformat = "%b '%y"),
+        yaxis    = list(title = "Miles"),
+        legend   = list(orientation = "h", y = -0.3, x = 0,
+                        font = list(size = 11), traceorder = "normal"),
+        margin   = list(t = 5, b = 5),
         paper_bgcolor = "rgba(0,0,0,0)",
         plot_bgcolor  = "rgba(0,0,0,0)"
       ) %>%
       plotly::config(displayModeBar = FALSE)
   })
-
+  
   # ── Distance vs elevation scatter ─────────────────────────────────────────────
   output$dist_elev_plot <- renderPlotly({
+    excluded_sports <- c("Golf", "StandUpPaddling", "Rowing", "AlpineSki", "NordicSki", "BackcountrySki")
     a <- acts_filtered() %>%
       filter(!is.na(distance_miles), !is.na(elevation_gain_ft),
-             distance_miles > 0.1)
-
+             distance_miles > 0.1,
+             !sport_type %in% excluded_sports)
+    
     plot_ly(a,
             x = ~distance_miles, y = ~elevation_gain_ft,
-            color = ~sport_type,
+            color = ~fmt_sport(sport_type),
             text  = ~paste0("<b>", name, "</b><br>",
                             round(distance_miles, 1), " mi | ",
                             round(elevation_gain_ft), " ft gain"),
@@ -319,27 +332,41 @@ server <- function(input, output, session) {
       ) %>%
       plotly::config(displayModeBar = FALSE)
   })
-
+  
   # ── Activity mix donut ───────────────────────────────────────────────────────
   output$sport_pie_plot <- renderPlotly({
     a <- acts_filtered() %>%
       filter(!is.na(sport_type)) %>%
-      group_by(sport_type) %>%
+      group_by(sport_label = fmt_sport(sport_type)) %>%
       summarise(miles = sum(distance_miles, na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(miles))
-
-    plot_ly(a, labels = ~sport_type, values = ~miles,
+    
+    n_sports <- nrow(a)
+    pal <- colorRampPalette(c( "#FC4C02", "#FCA26B", "#FFD4B0"))(max(n_sports, 1))
+    
+    plot_ly(a, labels = ~sport_label, values = ~miles,
             type = "pie", hole = 0.45,
-            textinfo = "label+percent",
+            textinfo = "none",
+            marker = list(
+              colors = pal,
+              line = list(color = "#ffffff", width = 2)  # white gap between slices
+            ),
             hovertemplate = "%{label}<br>%{value:.0f} mi (%{percent})<extra></extra>") %>%
       layout(
-        margin        = list(t = 5, b = 5, l = 10, r = 10),
-        paper_bgcolor = "rgba(0,0,0,0)"
+        margin      = list(t = 5, b = 5, l = 10, r = 10),
+        paper_bgcolor = "rgba(0,0,0,0)",
+        annotations = list(list(
+          text      = "Activity Mix",
+          x         = 0.5, y = 0.5,
+          xref      = "paper", yref = "paper",
+          showarrow = FALSE,
+          font      = list(size = 14, color = "#444444")
+        ))
       ) %>%
       plotly::hide_legend() %>%
       plotly::config(displayModeBar = FALSE)
   })
-
+  
   # ── Year-over-year cumulative miles ──────────────────────────────────────────
   output$yoy_plot <- renderPlotly({
     a <- acts_filtered() %>%
@@ -351,10 +378,10 @@ server <- function(input, output, session) {
       group_by(year) %>%
       mutate(cum_miles = cumsum(miles)) %>%
       ungroup()
-
+    
     years <- sort(unique(a$year))
     pal   <- colorRampPalette(c("#fcbf8a", STRAVA_ORANGE, "#8b1a00"))(max(length(years), 1))
-
+    
     p <- plot_ly()
     for (i in seq_along(years)) {
       yr <- filter(a, year == years[i])
@@ -377,7 +404,7 @@ server <- function(input, output, session) {
       ) %>%
       plotly::config(displayModeBar = FALSE)
   })
-
+  
   # ── Maintenance tables ────────────────────────────────────────────────────────
   render_maint_dt <- function(df) {
     DT::datatable(
@@ -399,11 +426,11 @@ server <- function(input, output, session) {
       class = "table table-hover table-sm"
     )
   }
-
+  
   output$maint_mtb <- DT::renderDT({
     render_maint_dt(build_maint_table_df(MAINTENANCE$mtb, acts(), MTB_TYPES))
   }, server = FALSE)
-
+  
   output$maint_road <- DT::renderDT({
     render_maint_dt(build_maint_table_df(MAINTENANCE$road, acts(), ROAD_TYPES))
   }, server = FALSE)
